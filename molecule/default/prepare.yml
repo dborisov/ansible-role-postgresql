@@ -1,0 +1,10 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install locale data for English
+      yum:
+        name: glibc-langpack-en
+
+    - name: Set en_US.UTF-8 locale
+      command: "localectl set-locale LANG=en_US.UTF-8"

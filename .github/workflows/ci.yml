@@ -1,0 +1,51 @@
+on: push
+
+jobs:
+  molecule:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        postgresql-version: ['10', '11', '12', '13', '14', '15']
+        config:
+          - namespace: "library"
+            image: "rockylinux"
+            tag: "8"
+          - namespace: "library"
+            image: "rockylinux"
+            tag: "9.0" # https://github.com/rocky-linux/sig-cloud-instance-images/issues/39
+          - namespace: "library"
+            image: "almalinux"
+            tag: "8"
+          - namespace: "library"
+            image: "almalinux"
+            tag: "9"
+          - namespace: "redhat"
+            image: "ubi8"
+            tag: "latest"
+          - namespace: "redhat"
+            image: "ubi9"
+            tag: "latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install tox
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tox tox-gh-actions
+
+      - name: Run tox
+        run: tox
+        env:
+          ANSIBLE_FORCE_COLOR: '1'
+          NAMESPACE: ${{ matrix.config.namespace }}
+          IMAGE: ${{ matrix.config.image }}
+          TAG: ${{ matrix.config.tag }}
+          POSTGRESQL_VERSION: ${{ matrix.postgresql-version }}

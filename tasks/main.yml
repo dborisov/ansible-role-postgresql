@@ -1,0 +1,136 @@
+---
+- name: Ensure PostgreSQL dnf module is disabled
+  community.general.ini_file:
+    path: /etc/dnf/modules.d/postgresql.module
+    section: postgresql
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    no_extra_spaces: yes
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - option: name
+      value: postgresql
+    - option: state
+      value: disabled
+    - option: stream
+      value: " "
+    - option: profiles
+      value: " "
+
+- name: Ensure PostgreSQL yum repositories are present
+  ansible.builtin.yum_repository:
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    baseurl: "{{ item.baseurl }}"
+    enabled: "{{ item.enabled | default(omit) }}"
+    gpgcheck: "{{ item.gpgcheck | default(omit) }}"
+    gpgkey: "{{ item.gpgkey | default(omit) }}"
+    repo_gpgcheck: "{{ item.repo_gpgcheck | default(omit) }}"
+    file: postgresql
+  loop: "{{ postgresql_repositories }}"
+
+- name: Ensure PostgreSQL rpm packages are installed
+  ansible.builtin.yum:
+    name: "{{ postgresql_packages }}"
+
+- name: Ensure PostgreSQL is initialized
+  ansible.builtin.command: "postgresql-{{ postgresql_version }}-setup initdb"
+  args:
+    creates: "{{ postgresql_data_dir }}/PG_VERSION"
+  environment:
+    PGSETUP_INITDB_OPTIONS: --encoding={{ postgresql_encoding }} --locale={{ postgresql_locale }}
+
+- name: Ensure PostgreSQL configs are present
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ postgresql_data_dir }}/{{ item }}"
+    owner: "{{ postgresql_user }}"
+    group: "{{ postgresql_group }}"
+    mode: "0600"
+  notify:
+    - Restart service
+  loop:
+    - postgresql.conf
+    - pg_hba.conf
+
+- name: Ensure required directories are present
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ postgresql_user }}"
+    group: "{{ postgresql_group }}"
+    mode: "0700"
+  loop:
+    - "{{ postgresql_conf_dir }}"
+    - "{{ postgresql_log_dir }}"
+
+- name: Ensure required symlinks are present
+  ansible.builtin.file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    owner: "{{ postgresql_user }}"
+    group: "{{ postgresql_group }}"
+  loop:
+    - src: "{{ postgresql_data_dir }}/postgresql.conf"
+      dest: "{{ postgresql_conf_dir }}/postgresql.conf"
+    - src: "{{ postgresql_data_dir }}/postgresql.auto.conf"
+      dest: "{{ postgresql_conf_dir }}/postgresql.auto.conf"
+    - src: "{{ postgresql_data_dir }}/pg_hba.conf"
+      dest: "{{ postgresql_conf_dir }}/pg_hba.conf"
+
+- name: Ensure PostgreSQL service is in the correct state
+  ansible.builtin.systemd:
+    name: "{{ postgresql_service_name }}"
+    state: "{{ postgresql_service_state }}"
+    enabled: "{{ postgresql_service_enabled }}"
+
+- name: Ensure PostgreSQL users are present
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default(omit) }}"
+    password: "{{ item.password | default(omit) }}"
+    no_password_changes: yes
+    priv: "{{ item.priv | default(omit) }}"
+    expires: "{{ item.expires | default(omit) }}"
+  loop: "{{ postgresql_users }}"
+  become: yes
+  become_user: "{{ postgresql_user }}"
+  no_log: yes
+  when: postgresql_users | default(False)
+
+- name: Ensure PostgreSQL databases are present
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default(omit) }}"
+    owner: "{{ item.owner | default(omit) }}"
+    encoding: "{{ item.encoding | default(omit) }}"
+  loop: "{{ postgresql_databases }}"
+  become: yes
+  become_user: "{{ postgresql_user }}"
+  when: postgresql_databases | default(False)
+
+- name: Ensure PostgreSQL extensions are present
+  community.postgresql.postgresql_ext:
+    name: "{{ item.name }}"
+    db: "{{ item.db }}"
+    state: "{{ item.state | default(omit) }}"
+    schema: "{{ item.schema | default(omit) }}"
+  loop: "{{ postgresql_extensions }}"
+  become: yes
+  become_user: "{{ postgresql_user }}"
+  when: postgresql_extensions | default(False)
+
+- name: Ensure PostgreSQL tables are present
+  community.postgresql.postgresql_table:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default(omit) }}"
+    owner: "{{ item.owner | default(omit) }}"
+    db: "{{ item.db | default(omit) }}"
+    columns: "{{ item.columns | default(omit) }}"
+  loop: "{{ postgresql_tables }}"
+  become: yes
+  become_user: "{{ postgresql_user }}"
+  when: postgresql_tables | default(False)

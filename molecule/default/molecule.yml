@@ -1,0 +1,39 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: "${IMAGE:-rockylinux}-${TAG:-9.0}-postgresql"
+    hostname: postgresql
+    # Systemd is absent in rockylinux 9.1 docker image.
+    # https://github.com/rocky-linux/sig-cloud-instance-images/issues/39
+    image: "${NAMESPACE:-library}/${IMAGE:-rockylinux}:${TAG:-9.0}"
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    command: /sbin/init
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    published_ports:
+      - "0.0.0.0:5432:5432/tcp"
+    networks:
+      - name: local
+    groups:
+      - postgresql
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      vault_password_file: "${MOLECULE_SCENARIO_DIRECTORY}/vault"
+  env:
+    POSTGRESQL_VERSION: ${POSTGRESQL_VERSION:-15}
+verifier:
+  name: ansible
+lint: |
+  set -e
+  yamllint .
+  ansible-lint

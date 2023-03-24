@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: Denis Borisov
+  namespace: dborisov
+  role_name: postgresql
+  description: Ansible role to install PostgreSQL
+  license: MIT
+  min_ansible_version: "2.11"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - postgresql

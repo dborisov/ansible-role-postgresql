@@ -1,27 +1,5 @@
-# ansible-role-postgresql
-Ansible role to install PostgreSQL
-
-# Supported Platforms
-- RedHat 8
-- RedHat 9
-
-# Requirements
-- The role supports the installation of PostgreSQL version 10 and higher. Default is 15.
-- Make sure you have installed locale data for your language to be able to set `postgresql_locale` other than `en_US.UTF-8`. See `molecule/default/prepare.yml` for details.
-
-# Example Inventory
-```
-[postgresql]
-pg1.local
-```
-
-# Example Variables
-```
-postgresql_version: "14"
-postgresql_listen_addresses:
-  - "0.0.0.0"
-  - "::"
-
+---
+postgresql_version: "{{ lookup('env', 'POSTGRESQL_VERSION') }}"
 postgresql_users:
   - name: test_user
     password: !vault |
@@ -31,11 +9,9 @@ postgresql_users:
           65663733653231346336363663643633643438663136316433613863326539316362316539656435
           3038343330616166340a306134363664616266316564343537633263656630376462616637646366
           3762
-
 postgresql_databases:
   - name: test_db
     owner: test_user
-
 postgresql_tables:
   - name: test_table
     owner: test_user
@@ -44,7 +20,6 @@ postgresql_tables:
       - id bigserial primary key
       - num bigint
       - stories text
-
 postgresql_extensions:
   - name: hstore
     db: test_db
@@ -58,29 +33,11 @@ postgresql_hba:
     users:
       - test_user
     address: "0.0.0.0/0"
-    method: scram-sha-256
+    method: "{% if postgresql_version | int > 13 %}scram-sha-256{% else %}md5{% endif %}"
   - type: host
     databases:
       - test_db
     users:
       - test_user
     address: "::/0"
-    method: scram-sha-256
-```
-
-# Example Playbook
-```
----
-- hosts: postgresql
-  roles:
-    - role: dborisov.postgresql
-```
-
-# Role Variables
-Please see `defaults/main.yml`
-
-# Dependencies
-None
-
-# License
-MIT
+    method: "{% if postgresql_version | int > 13 %}scram-sha-256{% else %}md5{% endif %}"
